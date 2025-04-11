@@ -22,6 +22,43 @@ snmpd_agentx_add() {
 	[ -n "$agentxsocket" ] && echo "agentXSocket $agentxsocket" >> $CONFIGFILE
 }
 
+snmpd_system_sysDescr() {
+	local model="unknown"
+	local serial="unknown"
+	local release="unknown"
+	local step="unknown"
+	local ctime="00-00-00"
+	local cdate="1970-00-00"
+	local sysdescr
+	local hostname="$1"
+
+	[ -f /etc/profile_alias ] && model="$(cat /etc/profile_alias)"
+	[ -f /tmp/sysinfo/serial ] && serial="$(cat /tmp/sysinfo/serial)"
+	[ -f /etc/os-release ] && . /etc/os-release && release="$PRETTY_NAME"
+	[ -f /etc/build_step ] && {
+		step="$(cat /etc/build_step | tr 'a-z' 'A-Z')"
+		[ "$step" = "stable" ] && step="RELEASE"
+	}
+
+	[ -d /rom ] && {
+		compile="$(stat -c '%Y' /rom)"
+		cdate="$(date --date @"${compile}" +"%Y-%m-%d")"
+		ctime="$(date --date @"${compile}" +"%H:%M:%S")"
+	}
+	[ -n "$model" -a "$hostname" -a "$serial" -a "$release" -a "$step" -a "$cdate" -a "$ctime" ] && {
+		sysdescr="${OPENWRT_DEVICE_MANUFACTURER}"
+		sysdescr="${sysdescr} $model,"
+		sysdescr="${sysdescr} S/N ${serial},"
+		sysdescr="${sysdescr} Software (${ID}),"
+		sysdescr="${sysdescr} Version ${VERSION},"
+		sysdescr="${sysdescr} ${step} SOFTWARE Copyright (c) by ${OPENWRT_DEVICE_MANUFACTURER},"
+		sysdescr="${sysdescr} Compiled ${cdate} ${ctime}"
+		echo "sysDescr $sysdescr" >> $CONFIGFILE
+	}
+	if [ -z "$sysdescr" ]; then
+		echo "$(uname -snrvm)" >> $CONFIGFILE
+}
+
 snmpd_system_add() {
 	local cfg="$1"
 	local hostname
