@@ -1,0 +1,70 @@
+--- a/ufpd
++++ b/ufpd
+@@ -2,14 +2,18 @@
+ 'use strict';
+ import * as uloop from "uloop";
+ import * as libubus from "ubus";
+-import * as unetmsg from "unetmsg.client";
+-import { readfile, glob, basename } from "fs";
++import { readfile, glob, basename, stat } from "fs";
+ let uht = require("uht");
+ push(REQUIRE_SEARCH_PATH, "/usr/share/ufp/*.uc");
+ 
++let unetmsg_installed = fs.stat("/usr/share/ucode/unetmsg")
++if (unetmsg_installed)
++	import * as unetmsg from "unetmsg.client";
++
+ uloop.init();
+ let ubus = libubus.connect();
+-let unet = unetmsg.open(ubus);
++if (unetmsg_installed)
++	let unet = unetmsg.open(ubus);
+ let fingerprints = {};
+ let fingerprint_ht = [];
+ let devices = {};
+@@ -49,17 +53,19 @@ function match_fingerprint(key)
+ 	return fp;
+ }
+ 
+-unet.publish("ufp", (req) => {
+-	let data = req.args;
+-	switch (data.type) {
+-	case "get_data":
+-		let mac = data.macaddr;
+-		if (mac)
+-			return { data: devices[mac] };
+-		return { data: devices };
+-	}
+-});
+-unet.subscribe("ufp");
++if (unetmsg_installed) {
++	unet.publish("ufp", (req) => {
++		let data = req.args;
++		switch (data.type) {
++		case "get_data":
++			let mac = data.macaddr;
++			if (mac)
++				return { data: devices[mac] };
++			return { data: devices };
++		}
++	});
++	unet.subscribe("ufp");
++}
+ 
+ function dev_timestamp_cmp(a, b)
+ {
+@@ -74,9 +80,11 @@ function network_devices(local) {
+ 		devices
+ 	];
+ 
+-	unet.request("ufp", "get_data", {}, (msg) => {
+-		push(device_lists, msg.data);
+-	});
++	if (unetmsg_installed) {
++		unet.request("ufp", "get_data", {}, (msg) => {
++			push(device_lists, msg.data);
++		});
++	}
+ 
+ 	let cur_devices = [];
+ 	for (let list in device_lists)
